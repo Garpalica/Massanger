@@ -96,11 +96,18 @@ namespace WpfMessenger.ViewModels
                                 }
                                 break;
 
-                            case "DeleteMessage" when packet.Data is Guid messageId:
-                                var messageToRemove = Messages.FirstOrDefault(m => m.Id == messageId);
-                                if (messageToRemove != null)
+                            case "DeleteMessage" when packet.Data is string messageIdStr:
+                                // Пытаемся преобразовать строку обратно в Guid
+                                if (Guid.TryParse(messageIdStr, out Guid messageId))
                                 {
-                                    Messages.Remove(messageToRemove);
+                                    // Если получилось, ищем сообщение с таким Id
+                                    var messageToRemove = Messages.FirstOrDefault(m => m.Id == messageId);
+                                    if (messageToRemove != null)
+                                    {
+                                        // И удаляем его
+                                        Messages.Remove(messageToRemove);
+                                        Console.WriteLine($"Сообщение {messageId} успешно удалено из интерфейса."); // Для отладки
+                                    }
                                 }
                                 break;
                         }
@@ -152,7 +159,7 @@ namespace WpfMessenger.ViewModels
                     // ✔️ ВОТ ОНА, НЕДОСТАЮЩАЯ СТРОКА!
                     // Сразу же удаляем сообщение у себя, не дожидаясь ответа.
                     // Это дает мгновенную реакцию интерфейса.
-                    Messages.Remove(messageToDelete);
+                    //Messages.Remove(messageToDelete);
                 }
             }
         }
