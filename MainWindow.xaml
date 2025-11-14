@@ -44,6 +44,8 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock FontWeight="Bold" Text="{Binding Author.Username}" Foreground="#005A9E"/>
                                     <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm:ss'}" Foreground="Gray" Margin="10,0,0,0"/>
+                                    <TextBlock Text="(изменено)" Foreground="Gray" FontStyle="Italic" Margin="5,0,0,0"
+                                        Visibility="{Binding IsEdited, Converter={StaticResource BoolToVis}}"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,20,0,0">

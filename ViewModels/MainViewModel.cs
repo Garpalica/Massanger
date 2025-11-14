@@ -1,12 +1,13 @@
 ﻿// Файл: WpfMessenger/ViewModels/MainViewModel.cs
-
 using Messenger.Shared;
+using Messenger.Shared.Models;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq; // <-- Убедись, что это добавлено
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -16,12 +17,7 @@ namespace WpfMessenger.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
-        // ✔️ НОВОЕ: Настройки для сериализации с информацией о типах
-        private readonly JsonSerializerSettings _jsonSettings = new JsonSerializerSettings
-        {
-            TypeNameHandling = TypeNameHandling.All
-        };
-
+        private readonly JsonSerializerSettings _jsonSettings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
         private TcpClient _client;
         private StreamReader _reader;
         private StreamWriter _writer;
@@ -29,7 +25,7 @@ namespace WpfMessenger.ViewModels
         private string _currentMessageText;
         private string _sendButtonContent = "Отправить";
         private bool _isEditing;
-        private MessageModel _editingMessage;
+        private MessageModel _editingMessage; // Храним сообщение, которое редактируем
 
         public string CurrentMessageText { get => _currentMessageText; set { _currentMessageText = value; OnPropertyChanged(); } }
         public string SendButtonContent { get => _sendButtonContent; set { _sendButtonContent = value; OnPropertyChanged(); } }
@@ -52,7 +48,7 @@ namespace WpfMessenger.ViewModels
             AttachFileCommand = new RelayCommand(async _ => await AttachFileAsync());
             StartEditMessageCommand = new RelayCommand(StartEditMessage);
             CancelEditCommand = new RelayCommand(CancelEdit);
-            DeleteMessageCommand = new RelayCommand(async _ => await DeleteMessageAsync(_));
+            DeleteMessageCommand = new RelayCommand(async param => await DeleteMessageAsync(param));
             InsertEmojiCommand = new RelayCommand(param => CurrentMessageText += param?.ToString());
             ConnectToServer();
         }
@@ -64,8 +60,8 @@ namespace WpfMessenger.ViewModels
                 _client = new TcpClient();
                 await _client.ConnectAsync("127.0.0.1", 8888);
                 var stream = _client.GetStream();
-                _reader = new StreamReader(stream);
-                _writer = new StreamWriter(stream);
+                _reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+                _writer = new StreamWriter(stream, System.Text.Encoding.UTF8);
                 Task.Run(ListenForMessages);
             }
             catch (Exception e) { MessageBox.Show($"Ошибка подключения: {e.Message}"); }
@@ -80,15 +76,35 @@ namespace WpfMessenger.ViewModels
                     var jsonPacket = await _reader.ReadLineAsync();
                     if (string.IsNullOrEmpty(jsonPacket)) continue;
 
-                    // ✔️ ИЗМЕНЕНИЕ: Десериализуем с новыми настройками
                     var packet = JsonConvert.DeserializeObject<Packet>(jsonPacket, _jsonSettings);
 
-                    if (packet.Command == "NewMessage" && packet.Data is MessageModel message)
+                    // ✔️ РАСШИРЯЕМ ЛОГИКУ ОБРАБОТКИ КОМАНД
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        // Теперь не нужно ничего дополнительно распаковывать!
-                        // Объект message уже готов к использованию.
-                        Application.Current.Dispatcher.Invoke(() => Messages.Add(message));
-                    }
+                        switch (packet.Command)
+                        {
+                            case "NewMessage" when packet.Data is MessageModel newMessage:
+                                Messages.Add(newMessage);
+                                break;
+
+                            case "UpdateMessage" when packet.Data is MessageModel updatedMessage:
+                                var messageToUpdate = Messages.FirstOrDefault(m => m.Id == updatedMessage.Id);
+                                if (messageToUpdate != null)
+                                {
+                                    messageToUpdate.Text = updatedMessage.Text;
+                                    messageToUpdate.IsEdited = true;
+                                }
+                                break;
+
+                            case "DeleteMessage" when packet.Data is Guid messageId:
+                                var messageToRemove = Messages.FirstOrDefault(m => m.Id == messageId);
+                                if (messageToRemove != null)
+                                {
+                                    Messages.Remove(messageToRemove);
+                                }
+                                break;
+                        }
+                    });
                 }
                 catch (Exception e)
                 {
@@ -98,24 +114,60 @@ namespace WpfMessenger.ViewModels
             }
         }
 
+        // ✔️ ОБНОВЛЕННЫЙ МЕТОД, КОТОРЫЙ УМЕЕТ И ОТПРАВЛЯТЬ, И ОБНОВЛЯТЬ
         private async Task SendOrUpdateMessageAsync()
         {
-            var message = new MessageModel
+            if (IsEditing)
             {
-                Author = CurrentUser,
-                Text = CurrentMessageText,
-                Timestamp = DateTime.Now
-            };
-
-            var packet = new Packet
+                // Логика обновления
+                _editingMessage.Text = CurrentMessageText;
+                var packet = new Packet { Command = "UpdateMessage", Data = _editingMessage };
+                await SendPacketAsync(packet);
+                CancelEdit(null); // Сбрасываем режим редактирования
+            }
+            else
             {
-                Command = "NewMessage",
-                // ✔️ ИЗМЕНЕНИЕ: Просто кладём объект в поле Data
-                Data = message
-            };
+                // Логика отправки нового сообщения
+                var message = new MessageModel { Author = CurrentUser, Text = CurrentMessageText, Timestamp = DateTime.Now };
+                var packet = new Packet { Command = "NewMessage", Data = message };
+                await SendPacketAsync(packet);
+                CurrentMessageText = string.Empty;
+            }
+        }
 
-            await SendPacketAsync(packet);
+        // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД УДАЛЕНИЯ
+        private async Task DeleteMessageAsync(object messageObj)
+        {
+            if (messageObj is MessageModel messageToDelete)
+            {
+                var result = MessageBox.Show("Вы уверены, что хотите удалить это сообщение?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.Yes)
+                {
+                    var packet = new Packet { Command = "DeleteMessage", Data = messageToDelete.Id };
+                    await SendPacketAsync(packet);
+                }
+            }
+        }
+
+        // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД НАЧАЛА РЕДАКТИРОВАНИЯ
+        private void StartEditMessage(object messageObj)
+        {
+            if (messageObj is MessageModel messageToEdit)
+            {
+                _editingMessage = messageToEdit;
+                CurrentMessageText = messageToEdit.Text;
+                IsEditing = true;
+                SendButtonContent = "Сохранить";
+            }
+        }
+
+        // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД ОТМЕНЫ РЕДАКТИРОВАНИЯ
+        private void CancelEdit(object obj)
+        {
+            IsEditing = false;
             CurrentMessageText = string.Empty;
+            _editingMessage = null;
+            SendButtonContent = "Отправить";
         }
 
         private async Task AttachFileAsync()
@@ -123,24 +175,16 @@ namespace WpfMessenger.ViewModels
             var openFileDialog = new OpenFileDialog();
             if (openFileDialog.ShowDialog() == true)
             {
-                var filePath = openFileDialog.FileName;
-                var fileBytes = await File.ReadAllBytesAsync(filePath);
+                var fileBytes = await File.ReadAllBytesAsync(openFileDialog.FileName);
                 var base64Content = Convert.ToBase64String(fileBytes);
-
                 var message = new MessageModel
                 {
                     Author = CurrentUser,
                     Timestamp = DateTime.Now,
-                    FileName = Path.GetFileName(filePath),
+                    FileName = Path.GetFileName(openFileDialog.FileName),
                     FileContentBase64 = base64Content
                 };
-
-                var packet = new Packet
-                {
-                    Command = "NewMessage",
-                    // ✔️ ИЗМЕНЕНИЕ: Просто кладём объект в поле Data
-                    Data = message
-                };
+                var packet = new Packet { Command = "NewMessage", Data = message };
                 await SendPacketAsync(packet);
             }
         }
@@ -149,21 +193,13 @@ namespace WpfMessenger.ViewModels
         {
             try
             {
-                // ✔️ ИЗМЕНЕНИЕ: Сериализуем с новыми настройками
                 string jsonPacket = JsonConvert.SerializeObject(packet, _jsonSettings);
                 await _writer.WriteLineAsync(jsonPacket);
                 await _writer.FlushAsync();
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка отправки: {ex.Message}");
-            }
+            catch (Exception ex) { MessageBox.Show($"Ошибка отправки: {ex.Message}"); }
         }
 
-        // Остальной код (редактирование, удаление и т.д.) без изменений
-        private void StartEditMessage(object messageObj) { /* ... */ }
-        private void CancelEdit(object obj) { /* ... */ }
-        private async Task DeleteMessageAsync(object messageObj) { /* ... */ }
         private bool CanSendMessage() => !string.IsNullOrWhiteSpace(CurrentMessageText);
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null) { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name)); }
