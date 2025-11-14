@@ -136,6 +136,8 @@ namespace WpfMessenger.ViewModels
         }
 
         // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД УДАЛЕНИЯ
+        // Файл: WpfMessenger/ViewModels/MainViewModel.cs
+
         private async Task DeleteMessageAsync(object messageObj)
         {
             if (messageObj is MessageModel messageToDelete)
@@ -143,8 +145,14 @@ namespace WpfMessenger.ViewModels
                 var result = MessageBox.Show("Вы уверены, что хотите удалить это сообщение?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
                 {
+                    // Отправляем команду на сервер для других клиентов
                     var packet = new Packet { Command = "DeleteMessage", Data = messageToDelete.Id };
                     await SendPacketAsync(packet);
+
+                    // ✔️ ВОТ ОНА, НЕДОСТАЮЩАЯ СТРОКА!
+                    // Сразу же удаляем сообщение у себя, не дожидаясь ответа.
+                    // Это дает мгновенную реакцию интерфейса.
+                    Messages.Remove(messageToDelete);
                 }
             }
         }
