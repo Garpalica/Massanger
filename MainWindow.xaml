@@ -1,143 +1,141 @@
-﻿<Window x:Class="Massanger.MainWindow"
+﻿<Window x:Class="WpfMessenger.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Massanger"
-        xmlns:viewmodels="clr-namespace:Massanger.ViewModels"
-        xmlns:converters="clr-namespace:Massanger.Converters"
+        xmlns:viewmodels="clr-namespace:WpfMessenger.ViewModels"
+        xmlns:converters="clr-namespace:WpfMessenger.Converters"
         mc:Ignorable="d"
-        Title="{Binding CurrentUser.Username}" Height="600" Width="800"
-        WindowStartupLocation="CenterScreen">
+        Title="{Binding CurrentUser.Username}" Height="650" Width="550"
+        WindowStartupLocation="CenterScreen"
+        MinWidth="450" MinHeight="500">
 
     <Window.DataContext>
         <viewmodels:MainViewModel/>
     </Window.DataContext>
 
     <Window.Resources>
-        <converters:Base64ToBitmapImageConverter x:Key="Base64ToImage"/>
         <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
-
-        <!-- ВОТ ИЗМЕНЕНИЕ №1: МЫ РЕГИСТРИРУЕМ НАШ НОВЫЙ КОНВЕРТЕР -->
-        <converters:EqualityConverter x:Key="EqualityConverter"/>
-
+        <converters:Base64ToBitmapImageConverter x:Key="Base64ToImage"/>
     </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3*"/>
-            <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="150"/>
         </Grid.ColumnDefinitions>
 
+        <!-- 3. ЛЕВАЯ ПАНЕЛЬ (ОБЛАСТЬ ЧАТА) -->
         <Grid Grid.Column="0" Margin="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
+                <!-- Список сообщений -->
                 <RowDefinition Height="Auto"/>
+                <!-- Панель редактирования -->
+                <RowDefinition Height="Auto"/>
+                <!-- Поле ввода -->
             </Grid.RowDefinitions>
 
-            <ListBox Grid.Row="0" 
-                     ItemsSource="{Binding Messages}"
-                     Margin="0,0,0,10"
-                     HorizontalContentAlignment="Stretch">
+            <!-- Список сообщений -->
+            <ListBox Grid.Row="0" ItemsSource="{Binding Messages}" Margin="0,0,0,10" 
+                     HorizontalContentAlignment="Stretch" BorderThickness="0" Background="#F9F9F9">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border x:Name="MessageContainer" BorderBrush="#ECECEC" BorderThickness="0,0,0,1" Padding="8" Margin="0,2" CornerRadius="5" MaxWidth="450">
-                            <StackPanel>
-                                <TextBlock x:Name="AuthorText" FontWeight="Bold" Text="{Binding Author.Username}" />
-                                <TextBlock Foreground="Gray" FontSize="10" Text="{Binding Timestamp, StringFormat='dd.MM.yyyy HH:mm:ss'}" />
-
-                                <TextBlock x:Name="TextMessageBlock" Text="{Binding Text}" TextWrapping="Wrap" Margin="0,5,0,5" FontSize="14"/>
-                                <Image x:Name="ImageMessageBlock" MaxHeight="250" Source="{Binding FileContentBase64, Converter={StaticResource Base64ToImage}}" Margin="0,5,0,5" Stretch="Uniform" />
-                                <TextBlock x:Name="FileNameBlock" Margin="0,5,0,5" FontStyle="Italic" Foreground="Blue">
-                                    <Run Text="Файл: "/><Run Text="{Binding FileName}"/>
-                                </TextBlock>
-
-                                <StackPanel x:Name="ActionButtonsPanel" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
-                                    <Button Content="✏️" FontSize="10" Padding="5,2" Margin="0,0,5,0"
-                                            Command="{Binding DataContext.StartEditMessageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                            CommandParameter="{Binding}"/>
-                                    <Button Content="Удалить" FontSize="10" Padding="5,2"
-                                            Command="{Binding DataContext.DeleteMessageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                            CommandParameter="{Binding}"/>
+                        <Border BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="8">
+                            <Grid>
+                                <!-- Информация о сообщении (автор, время) -->
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontWeight="Bold" Text="{Binding Author.Username}" Foreground="#005A9E"/>
+                                    <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm:ss'}" Foreground="Gray" Margin="10,0,0,0"/>
                                 </StackPanel>
-                            </StackPanel>
+
+                                <!-- Содержимое сообщения -->
+                                <StackPanel Margin="0,20,0,0">
+                                    <!-- БЛОК ДЛЯ ТЕКСТА -->
+                                    <TextBlock x:Name="TextMessage" Text="{Binding Text}" TextWrapping="Wrap" FontSize="14"/>
+
+                                    <!-- БЛОК ДЛЯ КАРТИНКИ -->
+                                    <Image x:Name="ImageMessage" MaxHeight="250" Stretch="Uniform"
+                                           Source="{Binding FileContentBase64, Converter={StaticResource Base64ToImage}}"/>
+
+                                    <!-- БЛОК ДЛЯ ИМЕНИ ФАЙЛА (если это не картинка) -->
+                                    <TextBlock x:Name="FileNameMessage" FontStyle="Italic" Foreground="DarkSlateBlue">
+                                        <Run Text="📎 Файл: "/>
+                                        <Run Text="{Binding FileName}"/>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <!-- Кнопки действий над сообщением -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Visibility="{Binding DataContext.IsEditing, Converter={StaticResource BoolToVis}, ConverterParameter=inverse, RelativeSource={RelativeSource AncestorType=Window}}">
+
+                                    <!-- Кнопка "Редактировать" (не показывается для файлов) -->
+                                    <Button Content="✏️" Command="{Binding DataContext.StartEditMessageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" Margin="0,0,5,0" Padding="3" FontSize="10" Background="Transparent" BorderThickness="0"
+                                            Visibility="{Binding IsFileMessage, Converter={StaticResource BoolToVis}, ConverterParameter=inverse}"/>
+
+                                    <!-- Кнопка "Удалить" -->
+                                    <Button Content="🗑️" Command="{Binding DataContext.DeleteMessageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" Padding="3" FontSize="10" Background="Transparent" BorderThickness="0"/>
+                                </StackPanel>
+                            </Grid>
                         </Border>
 
+                        <!-- "УМНЫЕ" ПРАВИЛА ПОКАЗА СОДЕРЖИМОГО -->
                         <DataTemplate.Triggers>
+                            <!-- Если это ТЕКСТОВОЕ сообщение (НЕ файл) -->
                             <DataTrigger Binding="{Binding IsFileMessage}" Value="False">
-                                <Setter TargetName="ImageMessageBlock" Property="Visibility" Value="Collapsed"/>
-                                <Setter TargetName="FileNameBlock" Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsFileMessage}" Value="True">
-                                <Setter TargetName="TextMessageBlock" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="ImageMessage" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="FileNameMessage" Property="Visibility" Value="Collapsed"/>
                             </DataTrigger>
 
-                            <!-- ВОТ ИЗМЕНЕНИЕ №2: ЗАМЕНЯЕМ DataTrigger НА MultiDataTrigger -->
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <!-- Мы отправляем два значения в наш конвертер -->
-                                    <Condition Value="True">
-                                        <Condition.Binding>
-                                            <MultiBinding Converter="{StaticResource EqualityConverter}">
-                                                <Binding Path="Author.Username"/>
-                                                <Binding Path="DataContext.CurrentUser.Username" RelativeSource="{RelativeSource AncestorType=Window}"/>
-                                            </MultiBinding>
-                                        </Condition.Binding>
-                                    </Condition>
-                                </MultiDataTrigger.Conditions>
-                                <!-- Если конвертер вернул "True", применяем стили -->
-                                <Setter TargetName="MessageContainer" Property="HorizontalAlignment" Value="Right" />
-                                <Setter TargetName="MessageContainer" Property="Background" Value="#E0F0FF" />
-                                <Setter TargetName="AuthorText" Property="Visibility" Value="Collapsed" />
-                                <Setter TargetName="ActionButtonsPanel" Property="Visibility" Value="Visible" />
-                            </MultiDataTrigger>
+                            <!-- Если это ФАЙЛОВОЕ сообщение -->
+                            <DataTrigger Binding="{Binding IsFileMessage}" Value="True">
+                                <Setter TargetName="TextMessage" Property="Visibility" Value="Collapsed"/>
+                                <!-- Можно добавить логику для разных типов файлов, но пока показываем картинку или имя файла -->
+                            </DataTrigger>
                         </DataTemplate.Triggers>
+
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <Grid Grid.Row="1">
+            <!-- Панель "Редактирование сообщения" -->
+            <Border Grid.Row="1" Background="#FFFBE6" CornerRadius="4" Padding="5" Margin="0,0,0,5"
+                    Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <TextBlock Text="Редактирование сообщения..." VerticalAlignment="Center" Foreground="#C69A00"/>
+                    <Button Content="Отмена" HorizontalAlignment="Right" Command="{Binding CancelEditCommand}" Background="#FFE4B5" BorderThickness="0"/>
+                </Grid>
+            </Border>
+
+            <!-- Панель ввода -->
+            <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBox Grid.Column="0" Text="{Binding CurrentMessageText, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" MinHeight="40" Margin="0,0,5,0" FontSize="14" AcceptsReturn="True" TextWrapping="Wrap"/>
+                <TextBox Grid.Column="0" Text="{Binding CurrentMessageText, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalContentAlignment="Center" MinHeight="40" Margin="0,0,5,0" FontSize="14"
+                         AcceptsReturn="True" TextWrapping="Wrap"/>
 
-                <Button Grid.Column="1" Content="❌" Margin="0,0,5,0" Width="40" 
-                        Command="{Binding CancelEditCommand}" 
-                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"/>
-
-                <Button Grid.Column="2" Content="😊" Margin="0,0,5,0" Width="40" Command="{Binding InsertEmojiCommand}" CommandParameter="😊"/>
-                <Button Grid.Column="3" Content="📎" Margin="0,0,5,0" Width="40" Command="{Binding AttachFileCommand}"/>
-                <Button Grid.Column="4" Content="{Binding SendButtonContent}" FontWeight="Bold" Width="60" IsDefault="True" Command="{Binding SendMessageCommand}"/>
+                <Button Grid.Column="1" Content="😊" ToolTip="Вставить эмодзи" Margin="0,0,5,0" Width="40" Command="{Binding InsertEmojiCommand}" CommandParameter="😊"/>
+                <Button Grid.Column="2" Content="📎" ToolTip="Прикрепить файл" Margin="0,0,5,0" Width="40" Command="{Binding AttachFileCommand}"/>
+                <Button Grid.Column="3" Content="{Binding SendButtonContent}" FontWeight="Bold" Width="80" IsDefault="True" Command="{Binding SendMessageCommand}"/>
             </Grid>
         </Grid>
 
-        <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1,0,0,0" Padding="5,10,10,10">
+        <!-- 4. ПРАВАЯ ПАНЕЛЬ (СПИСОК ПОЛЬЗОВАТЕЛЕЙ) -->
+        <Border Grid.Column="1" Background="#F0F0F0" BorderBrush="#D0D0D0" BorderThickness="1,0,0,0">
             <StackPanel>
-                <TextBlock Text="В сети:" Margin="5,0,0,10" FontWeight="Bold" FontSize="14"/>
-                <ListBox ItemsSource="{Binding OnlineUsers}" BorderThickness="0" Background="Transparent">
+                <TextBlock Text="В сети:" FontWeight="Bold" Margin="10" FontSize="16"/>
+                <ListBox ItemsSource="{Binding OnlineUsers}" Background="Transparent" BorderThickness="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Margin="2">
-                                <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding Username}"/>
-                                <TextBlock x:Name="TypingText" Text=" (печатает...)" FontStyle="Italic" Foreground="Gray"/>
-                            </StackPanel>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding CurrentStatus}" Value="Online">
-                                    <Setter TargetName="StatusIndicator" Property="Fill" Value="Green"/>
-                                    <Setter TargetName="TypingText" Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding CurrentStatus}" Value="Typing">
-                                    <Setter TargetName="StatusIndicator" Property="Fill" Value="Orange"/>
-                                    <Setter TargetName="TypingText" Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
+                            <TextBlock Text="{Binding Username}" Margin="10,0,10,5"/>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

@@ -1,7 +1,8 @@
-﻿using System;
+﻿// WpfMessenger/ViewModels/RelayCommand.cs
+using System;
 using System.Windows.Input;
 
-namespace Massanger.Commands
+namespace WpfMessenger.ViewModels
 {
     public class RelayCommand : ICommand
     {
@@ -14,8 +15,7 @@ namespace Massanger.Commands
             _canExecute = canExecute;
         }
 
-        public bool CanExecute(object parameter) => _canExecute?.Invoke(parameter) ?? true;
-
+        public bool CanExecute(object parameter) => _canExecute == null || _canExecute(parameter);
         public void Execute(object parameter) => _execute(parameter);
 
         public event EventHandler CanExecuteChanged

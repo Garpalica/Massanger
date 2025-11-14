@@ -3,13 +3,21 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace Massanger.Converters
+namespace WpfMessenger.Converters
 {
     public class BooleanToVisibilityConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return (value is bool b && b) ? Visibility.Visible : Visibility.Collapsed;
+            bool boolValue = (bool)value;
+
+            // Инвертируем логику, если в XAML указан параметр "inverse"
+            if (parameter != null && parameter.ToString().ToLower() == "inverse")
+            {
+                boolValue = !boolValue;
+            }
+
+            return boolValue ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

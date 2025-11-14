@@ -1,21 +1,21 @@
-﻿// Services/NetworkService.cs
+﻿// WpfMessenger/Services/NetworkService.cs
 using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
-using Messenger.Shared.Models;
+using System.Windows;
 
-namespace Massanger.Services // Убедись, что пространство имен верное
+namespace WpfMessenger.Services
 {
     public class NetworkService
     {
         private TcpClient _client;
-        private NetworkStream _stream;
         private StreamReader _reader;
         private StreamWriter _writer;
-        public bool IsConnected => _client?.Connected ?? false;
+
         public event Action<string> MessageReceived;
+        public bool IsConnected => _client?.Connected ?? false;
 
         public async Task ConnectAsync(string ipAddress, int port)
         {
@@ -24,39 +24,33 @@ namespace Massanger.Services // Убедись, что пространство 
                 _client = new TcpClient();
                 await _client.ConnectAsync(ipAddress, port);
 
-                // Инициализируем объекты для чтения и записи.
-                // Они будут жить, пока жив _client.
-                _stream = _client.GetStream();
-                _reader = new StreamReader(_stream, Encoding.UTF8);
-                _writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+                var stream = _client.GetStream();
+                _reader = new StreamReader(stream, Encoding.UTF8);
+                _writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
-                // Запускаем фоновую задачу, которая будет ПОСТОЯННО слушать сервер
-                Task.Run(() => ListenForMessages());
-
-                Console.WriteLine("Клиент успешно подключился к серверу!");
+                Task.Run(ListenForMessages);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка подключения к серверу: {ex.Message}");
+                MessageBox.Show($"Не удалось подключиться к серверу: {ex.Message}", "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
+                Application.Current.Shutdown();
             }
         }
 
-        // Этот метод будет работать в фоне и ждать сообщения
         private async Task ListenForMessages()
         {
             try
             {
-                while (_client.Connected)
+                while (IsConnected)
                 {
                     var jsonPacket = await _reader.ReadLineAsync();
-                    if (jsonPacket == null)
-                    {
-                        // Сервер разорвал соединение
-                        break;
-                    }
-                    // Уведомляем подписчиков (MainViewModel) о новом сообщении
+                    if (jsonPacket == null) break;
                     MessageReceived?.Invoke(jsonPacket);
                 }
+            }
+            catch (IOException)
+            {
+                // Соединение было принудительно разорвано, это нормально при закрытии.
             }
             catch (Exception ex)
             {
@@ -70,26 +64,15 @@ namespace Massanger.Services // Убедись, что пространство 
 
         public async Task SendMessageAsync(string jsonPacket)
         {
-            if (_client != null && _client.Connected)
+            if (IsConnected)
             {
-                try
-                {
-                    await _writer.WriteLineAsync(jsonPacket);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Ошибка отправки сообщения: {ex.Message}");
-                }
+                await _writer.WriteLineAsync(jsonPacket);
             }
         }
 
         public void Disconnect()
         {
-            _reader?.Close();
-            _writer?.Close();
-            _stream?.Close();
             _client?.Close();
-            Console.WriteLine("Клиент отключен.");
         }
     }
 }

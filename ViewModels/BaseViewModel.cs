@@ -1,8 +1,8 @@
-﻿// Massanger/ViewModels/BaseViewModel.cs
+﻿// WpfMessenger/ViewModels/BaseViewModel.cs
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace Massanger.ViewModels
+namespace WpfMessenger.ViewModels
 {
     public class BaseViewModel : INotifyPropertyChanged
     {

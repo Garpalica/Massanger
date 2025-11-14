@@ -1,12 +1,19 @@
 ﻿using System.Windows;
 
-namespace Massanger // <-- Убедитесь, что здесь правильное имя проекта
+// Проверь, что твое пространство имен здесь правильное
+namespace WpfMessenger
 {
-    public partial class MainWindow : Window // <-- Убедитесь, что есть 'partial'
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+
+    // ✔️ УБЕДИСЬ, ЧТО ЗДЕСЬ ЕСТЬ СЛОВО "partial"
+    public partial class MainWindow : Window
     {
         public MainWindow()
         {
-            InitializeComponent(); // <-- Теперь эта строка должна работать
+            // Здесь возникает ошибка
+            InitializeComponent();
         }
     }
 }

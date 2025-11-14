@@ -1,231 +1,204 @@
-﻿using Massanger.Commands;
-using Massanger.Services;
-using Messenger.Shared;
-using Messenger.Shared.Models;
-using Microsoft.Win32;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Threading.Tasks;
-using System.Windows.Input;
+using System.Windows;
+using Messenger.Shared; // Убедись, что using правильный
+using Microsoft.Win32;
+using Newtonsoft.Json;
 
-namespace Massanger.ViewModels
+namespace WpfMessenger.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
-        private readonly NetworkService _networkService;
+        private TcpClient _client;
+        private StreamReader _reader;
+        private StreamWriter _writer;
+
         private string _currentMessageText;
-        private MessageModel _messageToEdit;
+        private string _sendButtonContent = "Отправить";
+        private bool _isEditing;
+        private MessageModel _editingMessage; // Сообщение, которое редактируется
 
-        public UserModel CurrentUser { get; set; }
-        public ObservableCollection<MessageModel> Messages { get; } = new ObservableCollection<MessageModel>();
-        public ObservableCollection<UserStatus> OnlineUsers { get; } = new ObservableCollection<UserStatus>();
-
-        // --- Свойства для управления интерфейсом ---
-        public bool IsEditing => _messageToEdit != null;
-        public string SendButtonContent => IsEditing ? "Сохранить" : "➤";
-
+        // --- Свойства для привязки к интерфейсу ---
         public string CurrentMessageText
         {
             get => _currentMessageText;
-            set
-            {
-                if (_currentMessageText == value) return;
-                _currentMessageText = value;
-                OnPropertyChanged();
-
-                // Отправляем статусы "печатает" / "не печатает"
-                var statusCommand = string.IsNullOrEmpty(_currentMessageText) ? CommandType.UserStoppedTyping : CommandType.UserIsTyping;
-                var packet = new NetworkPacket { Command = statusCommand };
-                _networkService.SendMessageAsync(JsonSerializer.Serialize(packet));
-            }
+            set { _currentMessageText = value; OnPropertyChanged(); }
         }
 
+        public string SendButtonContent
+        {
+            get => _sendButtonContent;
+            set { _sendButtonContent = value; OnPropertyChanged(); }
+        }
+
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set { _isEditing = value; OnPropertyChanged(); }
+        }
+
+        public ObservableCollection<MessageModel> Messages { get; } = new ObservableCollection<MessageModel>();
+        public ObservableCollection<UserModel> OnlineUsers { get; } = new ObservableCollection<UserModel>();
+        public UserModel CurrentUser { get; set; }
+
         // --- Команды ---
-        public ICommand SendMessageCommand { get; }
-        public ICommand AttachFileCommand { get; }
-        public ICommand DeleteMessageCommand { get; }
-        public ICommand InsertEmojiCommand { get; }
-        public ICommand StartEditMessageCommand { get; }
-        public ICommand CancelEditCommand { get; }
+        public RelayCommand SendMessageCommand { get; }
+        public RelayCommand AttachFileCommand { get; }
+        public RelayCommand StartEditMessageCommand { get; }
+        public RelayCommand CancelEditCommand { get; }
+        public RelayCommand DeleteMessageCommand { get; }
+        public RelayCommand InsertEmojiCommand { get; }
 
         public MainViewModel()
         {
-            _networkService = new NetworkService();
-            _networkService.MessageReceived += OnMessageReceived;
-
-            // TODO: Заменить на реальную логику входа пользователя
             CurrentUser = new UserModel { Username = $"User{new Random().Next(100, 999)}" };
 
-            SendMessageCommand = new RelayCommand(SendMessage, (p) => !string.IsNullOrWhiteSpace(CurrentMessageText));
-            AttachFileCommand = new RelayCommand(AttachFile);
-            DeleteMessageCommand = new RelayCommand(DeleteMessage);
-            InsertEmojiCommand = new RelayCommand((p) => CurrentMessageText += p?.ToString());
+            SendMessageCommand = new RelayCommand(async _ => await SendOrUpdateMessageAsync(), _ => CanSendMessage());
+            AttachFileCommand = new RelayCommand(async _ => await AttachFileAsync());
             StartEditMessageCommand = new RelayCommand(StartEditMessage);
             CancelEditCommand = new RelayCommand(CancelEdit);
+            DeleteMessageCommand = new RelayCommand(async _ => await DeleteMessageAsync(_));
+            InsertEmojiCommand = new RelayCommand(param => CurrentMessageText += param?.ToString());
 
-            ConnectToServerAsync();
+            ConnectToServer();
         }
 
-        private async void ConnectToServerAsync()
+        private async void ConnectToServer()
         {
-            await _networkService.ConnectAsync("127.0.0.1", 8888);
-            if (_networkService.IsConnected)
+            try
             {
-                // Отправляем свое имя на сервер при подключении
-                var packet = new NetworkPacket
+                _client = new TcpClient();
+                await _client.ConnectAsync("127.0.0.1", 8888);
+                var stream = _client.GetStream();
+                _reader = new StreamReader(stream);
+                _writer = new StreamWriter(stream);
+                Task.Run(ListenForMessages);
+            }
+            catch (Exception e) { MessageBox.Show($"Ошибка подключения: {e.Message}"); }
+        }
+
+        private async Task ListenForMessages()
+        {
+            // Эта часть пока остается простой, без обработки команд редактирования от сервера
+            while (true)
+            {
+                try
                 {
-                    Command = CommandType.SetUsername,
-                    Payload = CurrentUser.Username
-                };
-                await _networkService.SendMessageAsync(JsonSerializer.Serialize(packet));
-            }
-        }
+                    var jsonPacket = await _reader.ReadLineAsync();
+                    if (string.IsNullOrEmpty(jsonPacket)) continue;
 
-        private async void SendMessage(object parameter)
-        {
-            if (string.IsNullOrWhiteSpace(CurrentMessageText)) return;
+                    var packet = JsonConvert.DeserializeObject<Packet>(jsonPacket);
 
-            NetworkPacket packet;
-
-            if (IsEditing) // РЕЖИМ РЕДАКТИРОВАНИЯ
-            {
-                _messageToEdit.Text = CurrentMessageText;
-                packet = new NetworkPacket { Command = CommandType.EditMessage, Payload = JsonSerializer.Serialize(_messageToEdit) };
-            }
-            else // РЕЖИМ ОТПРАВКИ НОВОГО СООБЩЕНИЯ
-            {
-                var message = new MessageModel
+                    if (packet.Command == "NewMessage")
+                    {
+                        var message = JsonConvert.DeserializeObject<MessageModel>(packet.JsonData);
+                        Application.Current.Dispatcher.Invoke(() => Messages.Add(message));
+                    }
+                }
+                catch (Exception e)
                 {
-                    Author = CurrentUser,
-                    Text = CurrentMessageText,
-                    Timestamp = DateTime.Now
-                };
-                packet = new NetworkPacket { Command = CommandType.NewMessage, Payload = JsonSerializer.Serialize(message) };
+                    Application.Current.Dispatcher.Invoke(() => MessageBox.Show($"Связь потеряна: {e.Message}"));
+                    break;
+                }
             }
-
-            await _networkService.SendMessageAsync(JsonSerializer.Serialize(packet));
-
-            // Сбрасываем поле ввода и выходим из режима редактирования
-            CancelEdit(null);
         }
 
-        private async void AttachFile(object parameter)
+        // --- Логика команд ---
+
+        private async Task SendOrUpdateMessageAsync()
         {
-            var openFileDialog = new OpenFileDialog
+            // Здесь будет логика для отправки нового или обновленного сообщения
+            var message = new MessageModel
             {
-                Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt|Images|*.png;*.jpg;*.jpeg;*.gif"
+                Author = CurrentUser,
+                Text = CurrentMessageText,
+                Timestamp = DateTime.Now
             };
 
+            var packet = new Packet
+            {
+                Command = "NewMessage", // Пока отправляем все как новые
+                JsonData = JsonConvert.SerializeObject(message)
+            };
+
+            await SendPacketAsync(packet);
+
+            Messages.Add(message); // Добавляем себе локально
+            CurrentMessageText = string.Empty;
+        }
+
+        private async Task AttachFileAsync()
+        {
+            var openFileDialog = new OpenFileDialog();
             if (openFileDialog.ShowDialog() == true)
             {
                 var filePath = openFileDialog.FileName;
-                var fileName = Path.GetFileName(filePath);
                 var fileBytes = await File.ReadAllBytesAsync(filePath);
                 var base64Content = Convert.ToBase64String(fileBytes);
 
                 var message = new MessageModel
                 {
-                    Id = Guid.NewGuid(),
                     Author = CurrentUser,
                     Timestamp = DateTime.Now,
-                    IsFileMessage = true,
-                    FileName = fileName,
+                    FileName = Path.GetFileName(filePath),
                     FileContentBase64 = base64Content
                 };
 
-                var packet = new NetworkPacket { Command = CommandType.FileMessage, Payload = JsonSerializer.Serialize(message) };
-                await _networkService.SendMessageAsync(JsonSerializer.Serialize(packet));
+                var packet = new Packet { Command = "NewMessage", JsonData = JsonConvert.SerializeObject(message) };
+                await SendPacketAsync(packet);
+                Messages.Add(message);
             }
         }
 
-        private async void DeleteMessage(object parameter)
+        private void StartEditMessage(object messageObj)
         {
-            if (parameter is MessageModel messageToDelete)
+            if (messageObj is MessageModel message)
             {
-                var packet = new NetworkPacket { Command = CommandType.DeleteMessage, Payload = JsonSerializer.Serialize(messageToDelete) };
-                await _networkService.SendMessageAsync(JsonSerializer.Serialize(packet));
-            }
-        }
-
-        private void StartEditMessage(object parameter)
-        {
-            if (parameter is MessageModel message)
-            {
-                _messageToEdit = message;
+                _editingMessage = message;
                 CurrentMessageText = message.Text;
-                OnPropertyChanged(nameof(IsEditing));
-                OnPropertyChanged(nameof(SendButtonContent));
+                IsEditing = true;
+                SendButtonContent = "Сохранить";
             }
         }
 
-        private void CancelEdit(object parameter)
+        private void CancelEdit(object obj)
         {
-            _messageToEdit = null;
+            IsEditing = false;
             CurrentMessageText = string.Empty;
-            OnPropertyChanged(nameof(IsEditing));
-            OnPropertyChanged(nameof(SendButtonContent));
+            _editingMessage = null;
+            SendButtonContent = "Отправить";
         }
 
-        private void OnMessageReceived(string jsonPacket)
+        private async Task DeleteMessageAsync(object messageObj)
+        {
+            // Логика удаления пока будет только локальной для демонстрации
+            if (messageObj is MessageModel message)
+            {
+                MessageBox.Show("Функция удаления сообщения в разработке!");
+                // В будущем здесь будет отправка пакета на сервер
+                // Application.Current.Dispatcher.Invoke(() => Messages.Remove(message));
+            }
+        }
+
+        private bool CanSendMessage() => !string.IsNullOrWhiteSpace(CurrentMessageText);
+
+        private async Task SendPacketAsync(Packet packet)
         {
             try
             {
-                var packet = JsonSerializer.Deserialize<NetworkPacket>(jsonPacket);
-                if (packet == null) return;
-
-                App.Current.Dispatcher.Invoke(() =>
-                {
-                    switch (packet.Command)
-                    {
-                        case CommandType.NewMessage:
-                        case CommandType.FileMessage:
-                            var newMessage = JsonSerializer.Deserialize<MessageModel>(packet.Payload);
-                            if (newMessage != null) Messages.Add(newMessage);
-                            break;
-
-                        case CommandType.DeleteMessage:
-                            var messageToDelete = JsonSerializer.Deserialize<MessageModel>(packet.Payload);
-                            var foundMessage = Messages.FirstOrDefault(m => m.Id == messageToDelete.Id);
-                            if (foundMessage != null) Messages.Remove(foundMessage);
-                            break;
-
-                        case CommandType.EditMessage:
-                            var editedMessage = JsonSerializer.Deserialize<MessageModel>(packet.Payload);
-                            var messageToUpdate = Messages.FirstOrDefault(m => m.Id == editedMessage.Id);
-                            if (messageToUpdate != null)
-                            {
-                                messageToUpdate.Text = editedMessage.Text; // Свойство Text само вызовет OnPropertyChanged
-                            }
-                            break;
-
-                        case CommandType.UpdateUserList:
-                            var users = JsonSerializer.Deserialize<List<UserStatus>>(packet.Payload);
-                            OnlineUsers.Clear();
-                            if (users != null)
-                            {
-                                foreach (var user in users)
-                                {
-                                    // Не добавляем себя в список онлайн-пользователей
-                                    if (user.Username != CurrentUser.Username)
-                                    {
-                                        OnlineUsers.Add(user);
-                                    }
-                                }
-                            }
-                            break;
-                    }
-                });
+                string jsonPacket = JsonConvert.SerializeObject(packet);
+                await _writer.WriteLineAsync(jsonPacket);
+                await _writer.FlushAsync();
             }
             catch (Exception ex)
             {
-                // Обработка ошибки десериализации
-                Console.WriteLine($"Error processing received message: {ex.Message}");
+                MessageBox.Show($"Ошибка отправки: {ex.Message}");
             }
         }
 
