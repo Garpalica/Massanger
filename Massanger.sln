@@ -1,9 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36518.9 d17.14
+VisualStudioVersion = 17.14.36518.9
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Massanger", "Massanger.csproj", "{FAC32F3B-40F8-4D73-AC5B-084B2069E7C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messenger.Shared", "..\Messenger.Shared\Messenger.Shared.csproj", "{61EF100D-7620-4688-8BDD-53A58748D9D6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatServer", "..\ChatServer_new\ChatServer.csproj", "{41405984-1502-4813-BCBD-23C60F819732}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +19,14 @@ Global
 		{FAC32F3B-40F8-4D73-AC5B-084B2069E7C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FAC32F3B-40F8-4D73-AC5B-084B2069E7C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FAC32F3B-40F8-4D73-AC5B-084B2069E7C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61EF100D-7620-4688-8BDD-53A58748D9D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61EF100D-7620-4688-8BDD-53A58748D9D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61EF100D-7620-4688-8BDD-53A58748D9D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61EF100D-7620-4688-8BDD-53A58748D9D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41405984-1502-4813-BCBD-23C60F819732}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41405984-1502-4813-BCBD-23C60F819732}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41405984-1502-4813-BCBD-23C60F819732}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41405984-1502-4813-BCBD-23C60F819732}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

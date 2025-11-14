@@ -4,9 +4,144 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Massanger"
+        xmlns:viewmodels="clr-namespace:Massanger.ViewModels"
+        xmlns:converters="clr-namespace:Massanger.Converters"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="{Binding CurrentUser.Username}" Height="600" Width="800"
+        WindowStartupLocation="CenterScreen">
 
+    <Window.DataContext>
+        <viewmodels:MainViewModel/>
+    </Window.DataContext>
+
+    <Window.Resources>
+        <converters:Base64ToBitmapImageConverter x:Key="Base64ToImage"/>
+        <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- ВОТ ИЗМЕНЕНИЕ №1: МЫ РЕГИСТРИРУЕМ НАШ НОВЫЙ КОНВЕРТЕР -->
+        <converters:EqualityConverter x:Key="EqualityConverter"/>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="1*"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <ListBox Grid.Row="0" 
+                     ItemsSource="{Binding Messages}"
+                     Margin="0,0,0,10"
+                     HorizontalContentAlignment="Stretch">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border x:Name="MessageContainer" BorderBrush="#ECECEC" BorderThickness="0,0,0,1" Padding="8" Margin="0,2" CornerRadius="5" MaxWidth="450">
+                            <StackPanel>
+                                <TextBlock x:Name="AuthorText" FontWeight="Bold" Text="{Binding Author.Username}" />
+                                <TextBlock Foreground="Gray" FontSize="10" Text="{Binding Timestamp, StringFormat='dd.MM.yyyy HH:mm:ss'}" />
+
+                                <TextBlock x:Name="TextMessageBlock" Text="{Binding Text}" TextWrapping="Wrap" Margin="0,5,0,5" FontSize="14"/>
+                                <Image x:Name="ImageMessageBlock" MaxHeight="250" Source="{Binding FileContentBase64, Converter={StaticResource Base64ToImage}}" Margin="0,5,0,5" Stretch="Uniform" />
+                                <TextBlock x:Name="FileNameBlock" Margin="0,5,0,5" FontStyle="Italic" Foreground="Blue">
+                                    <Run Text="Файл: "/><Run Text="{Binding FileName}"/>
+                                </TextBlock>
+
+                                <StackPanel x:Name="ActionButtonsPanel" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
+                                    <Button Content="✏️" FontSize="10" Padding="5,2" Margin="0,0,5,0"
+                                            Command="{Binding DataContext.StartEditMessageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"/>
+                                    <Button Content="Удалить" FontSize="10" Padding="5,2"
+                                            Command="{Binding DataContext.DeleteMessageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsFileMessage}" Value="False">
+                                <Setter TargetName="ImageMessageBlock" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="FileNameBlock" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFileMessage}" Value="True">
+                                <Setter TargetName="TextMessageBlock" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+
+                            <!-- ВОТ ИЗМЕНЕНИЕ №2: ЗАМЕНЯЕМ DataTrigger НА MultiDataTrigger -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <!-- Мы отправляем два значения в наш конвертер -->
+                                    <Condition Value="True">
+                                        <Condition.Binding>
+                                            <MultiBinding Converter="{StaticResource EqualityConverter}">
+                                                <Binding Path="Author.Username"/>
+                                                <Binding Path="DataContext.CurrentUser.Username" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                            </MultiBinding>
+                                        </Condition.Binding>
+                                    </Condition>
+                                </MultiDataTrigger.Conditions>
+                                <!-- Если конвертер вернул "True", применяем стили -->
+                                <Setter TargetName="MessageContainer" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="MessageContainer" Property="Background" Value="#E0F0FF" />
+                                <Setter TargetName="AuthorText" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="ActionButtonsPanel" Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0" Text="{Binding CurrentMessageText, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" MinHeight="40" Margin="0,0,5,0" FontSize="14" AcceptsReturn="True" TextWrapping="Wrap"/>
+
+                <Button Grid.Column="1" Content="❌" Margin="0,0,5,0" Width="40" 
+                        Command="{Binding CancelEditCommand}" 
+                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"/>
+
+                <Button Grid.Column="2" Content="😊" Margin="0,0,5,0" Width="40" Command="{Binding InsertEmojiCommand}" CommandParameter="😊"/>
+                <Button Grid.Column="3" Content="📎" Margin="0,0,5,0" Width="40" Command="{Binding AttachFileCommand}"/>
+                <Button Grid.Column="4" Content="{Binding SendButtonContent}" FontWeight="Bold" Width="60" IsDefault="True" Command="{Binding SendMessageCommand}"/>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1,0,0,0" Padding="5,10,10,10">
+            <StackPanel>
+                <TextBlock Text="В сети:" Margin="5,0,0,10" FontWeight="Bold" FontSize="14"/>
+                <ListBox ItemsSource="{Binding OnlineUsers}" BorderThickness="0" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="2">
+                                <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Username}"/>
+                                <TextBlock x:Name="TypingText" Text=" (печатает...)" FontStyle="Italic" Foreground="Gray"/>
+                            </StackPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStatus}" Value="Online">
+                                    <Setter TargetName="StatusIndicator" Property="Fill" Value="Green"/>
+                                    <Setter TargetName="TypingText" Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding CurrentStatus}" Value="Typing">
+                                    <Setter TargetName="StatusIndicator" Property="Fill" Value="Orange"/>
+                                    <Setter TargetName="TypingText" Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>
