@@ -17,7 +17,6 @@
     <Window.Resources>
         <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:Base64ToBitmapImageConverter x:Key="Base64ToImage"/>
-        <!-- ✔️ ДОБАВЛЯЕМ НАШ НОВЫЙ КОНВЕРТЕР В РЕСУРСЫ -->
         <converters:EqualityConverter x:Key="EqualityConverter"/>
     </Window.Resources>
 
@@ -27,7 +26,7 @@
             <ColumnDefinition Width="150"/>
         </Grid.ColumnDefinitions>
 
-        <!-- ЛЕВАЯ ПАНЕЛЬ (ОБЛАСТЬ ЧАТА) -->
+        <!--(ОБЛАСТЬ ЧАТА) -->
         <Grid Grid.Column="0" Margin="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
@@ -60,7 +59,6 @@
                                     <ContentControl.Style>
                                         <Style TargetType="ContentControl">
                                             <Setter Property="Visibility" Value="Collapsed"/>
-                                            <!-- ✔️ ПОЛНОСТЬЮ ПЕРЕДЕЛАННЫЙ ТРИГГЕР -->
                                             <Style.Triggers>
                                                 <MultiDataTrigger>
                                                     <MultiDataTrigger.Conditions>
@@ -105,7 +103,6 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <!-- Остальная часть файла без изменений -->
             <Border Grid.Row="1" Background="#FFFBE6" CornerRadius="4" Padding="5" Margin="0,0,0,5"
                     Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
                 <Grid>

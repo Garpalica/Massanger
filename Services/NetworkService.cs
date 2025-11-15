@@ -1,4 +1,4 @@
-﻿// WpfMessenger/Services/NetworkService.cs
+﻿
 using System;
 using System.IO;
 using System.Net.Sockets;
@@ -50,7 +50,7 @@ namespace WpfMessenger.Services
             }
             catch (IOException)
             {
-                // Соединение было принудительно разорвано, это нормально при закрытии.
+                // Соединение принудительно разорвано при выходе клиента
             }
             catch (Exception ex)
             {

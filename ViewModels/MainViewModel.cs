@@ -1,4 +1,4 @@
-﻿// Файл: WpfMessenger/ViewModels/MainViewModel.cs
+﻿
 using Messenger.Shared;
 using Messenger.Shared.Models;
 using Microsoft.Win32;
@@ -7,7 +7,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Linq; // <-- Убедись, что это добавлено
+using System.Linq;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -78,7 +78,6 @@ namespace WpfMessenger.ViewModels
 
                     var packet = JsonConvert.DeserializeObject<Packet>(jsonPacket, _jsonSettings);
 
-                    // ✔️ РАСШИРЯЕМ ЛОГИКУ ОБРАБОТКИ КОМАНД
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         switch (packet.Command)
@@ -121,7 +120,7 @@ namespace WpfMessenger.ViewModels
             }
         }
 
-        // ✔️ ОБНОВЛЕННЫЙ МЕТОД, КОТОРЫЙ УМЕЕТ И ОТПРАВЛЯТЬ, И ОБНОВЛЯТЬ
+        // Редактирование и отправка
         private async Task SendOrUpdateMessageAsync()
         {
             if (IsEditing)
@@ -134,7 +133,7 @@ namespace WpfMessenger.ViewModels
             }
             else
             {
-                // Логика отправки нового сообщения
+                //отправка нового сообщения
                 var message = new MessageModel { Author = CurrentUser, Text = CurrentMessageText, Timestamp = DateTime.Now };
                 var packet = new Packet { Command = "NewMessage", Data = message };
                 await SendPacketAsync(packet);
@@ -142,8 +141,7 @@ namespace WpfMessenger.ViewModels
             }
         }
 
-        // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД УДАЛЕНИЯ
-        // Файл: WpfMessenger/ViewModels/MainViewModel.cs
+        //метод удалаения
 
         private async Task DeleteMessageAsync(object messageObj)
         {
@@ -155,16 +153,9 @@ namespace WpfMessenger.ViewModels
                     // Отправляем команду на сервер для других клиентов
                     var packet = new Packet { Command = "DeleteMessage", Data = messageToDelete.Id };
                     await SendPacketAsync(packet);
-
-                    // ✔️ ВОТ ОНА, НЕДОСТАЮЩАЯ СТРОКА!
-                    // Сразу же удаляем сообщение у себя, не дожидаясь ответа.
-                    // Это дает мгновенную реакцию интерфейса.
-                    //Messages.Remove(messageToDelete);
                 }
             }
         }
-
-        // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД НАЧАЛА РЕДАКТИРОВАНИЯ
         private void StartEditMessage(object messageObj)
         {
             if (messageObj is MessageModel messageToEdit)
@@ -176,7 +167,7 @@ namespace WpfMessenger.ViewModels
             }
         }
 
-        // ✔️ РЕАЛИЗОВАННЫЙ МЕТОД ОТМЕНЫ РЕДАКТИРОВАНИЯ
+        // отмена редактирования
         private void CancelEdit(object obj)
         {
             IsEditing = false;

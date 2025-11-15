@@ -1,4 +1,4 @@
-﻿// Файл: WpfMessenger/Converters/EqualityConverter.cs
+﻿
 using System;
 using System.Globalization;
 using System.Windows.Data;
@@ -22,7 +22,6 @@ namespace WpfMessenger.Converters
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
-            // Обратное преобразование нам не нужно
             throw new NotImplementedException();
         }
     }

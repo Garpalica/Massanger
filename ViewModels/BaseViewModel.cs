@@ -1,4 +1,4 @@
-﻿// WpfMessenger/ViewModels/BaseViewModel.cs
+﻿
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
